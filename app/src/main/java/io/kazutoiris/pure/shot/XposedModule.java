@@ -1,7 +1,9 @@
 package io.kazutoiris.pure.shot;
 
+import android.util.SparseIntArray;
 import android.view.WindowManager;
 
+import java.lang.reflect.Constructor;
 import java.util.Objects;
 
 import de.robv.android.xposed.IXposedHookLoadPackage;
@@ -22,20 +24,28 @@ public class XposedModule implements IXposedHookLoadPackage {
 
 		if (Objects.equals(lpparam.packageName, "android")) {
 			{
-				Class<?> hookClass = XposedHelpers.findClassIfExists("com.android.server.wm.WindowSurfaceController", classLoader);
-				XposedBridge.hookAllConstructors(hookClass, new XC_MethodHook() {
-					@Override
-					protected void beforeHookedMethod(final MethodHookParam param) throws Throwable {
-						super.beforeHookedMethod(param);
-						int windowType = (int) param.args[4];
-						if (windowType < WindowManager.LayoutParams.FIRST_SYSTEM_WINDOW || windowType == WindowManager.LayoutParams.TYPE_WALLPAPER) {
-							return;
-						}
-						int flags = (int) param.args[2];
-						flags |= 1 << 6;
-						param.args[2] = flags;
+				Class<?> hookClass = XposedHelpers.findClassIfExists(android.view.SurfaceControl.class.getCanonicalName(), classLoader);
+				for (Constructor<?> constructor : hookClass.getDeclaredConstructors()) {
+					// private SurfaceControl(SurfaceSession session, String name, int w, int h, int format, int flags,
+					//         SurfaceControl parent, SparseIntArray metadata, WeakReference<View> localOwnerView,
+					//         String callsite)
+					if (constructor.getParameterCount() == 10) {
+						XposedBridge.hookMethod(constructor, new XC_MethodHook() {
+							@Override
+							protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+								super.beforeHookedMethod(param);
+								SparseIntArray metadata = (SparseIntArray) param.args[7];
+								int windowType = metadata.get(2);
+								if (windowType < WindowManager.LayoutParams.FIRST_SYSTEM_WINDOW || windowType == WindowManager.LayoutParams.TYPE_WALLPAPER) {
+									return;
+								}
+								int flags = (int) param.args[5];
+								flags |= 1 << 6;
+								param.args[5] = flags;
+							}
+						});
 					}
-				});
+				}
 			}
 		}
 	}
