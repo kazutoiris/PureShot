@@ -34,14 +34,22 @@ public class XposedModule implements IXposedHookLoadPackage {
 							@Override
 							protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
 								super.beforeHookedMethod(param);
+								String callsite = (String) param.args[9];
+								if (!Objects.equals(callsite, "WindowSurfaceController")) {
+									return;
+								}
 								SparseIntArray metadata = (SparseIntArray) param.args[7];
-								int windowType = metadata.get(2);
+								int windowType = metadata.get(2, -1);
 								if (windowType < WindowManager.LayoutParams.FIRST_SYSTEM_WINDOW || windowType == WindowManager.LayoutParams.TYPE_WALLPAPER) {
 									return;
 								}
-								int flags = (int) param.args[5];
-								flags |= 1 << 6;
-								param.args[5] = flags;
+								if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.S) {
+									metadata.put(2, 441731);
+								} else {
+									int flags = (int) param.args[5];
+									flags |= 1 << 6;
+									param.args[5] = flags;
+								}
 							}
 						});
 					}
