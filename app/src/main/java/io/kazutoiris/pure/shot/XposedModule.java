@@ -39,17 +39,26 @@ public class XposedModule implements IXposedHookLoadPackage {
 							protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
 								super.beforeHookedMethod(param);
 								XposedBridge.log("args: " + Arrays.toString(param.args));
+								String callsite = (String) param.args[9];
+								XposedBridge.log("callsite: " + callsite);
+								if (!Objects.equals(callsite, "WindowSurfaceController")) {
+									return;
+								}
 								SparseIntArray metadata = (SparseIntArray) param.args[7];
-								XposedBridge.log("metadata: " + metadata.toString());
-								int windowType = metadata.get(2);
+								XposedBridge.log("metadata: " + metadata);
+								int windowType = metadata.get(2, -1);
 								XposedBridge.log("windowType: " + windowType);
 								if (windowType < WindowManager.LayoutParams.FIRST_SYSTEM_WINDOW || windowType == WindowManager.LayoutParams.TYPE_WALLPAPER) {
 									XposedBridge.log("ignored current window");
 									return;
 								}
-								int flags = (int) param.args[5];
-								flags |= 1 << 6;
-								param.args[5] = flags;
+								if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.S) {
+									metadata.setValueAt(2, 441731);
+								} else {
+									int flags = (int) param.args[5];
+									flags |= 1 << 6;
+									param.args[5] = flags;
+								}
 							}
 						});
 					}
