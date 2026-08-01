@@ -53,9 +53,11 @@ public class XposedModule implements IXposedHookLoadPackage {
 									return;
 								}
 								if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.S) {
-									metadata.setValueAt(2, 441731);
+									XposedBridge.log(String.format(Locale.getDefault(), "try to set window type: %d -> %d", windowType, 441731));
+									metadata.put(2, 441731);
 								} else {
 									int flags = (int) param.args[5];
+									XposedBridge.log(String.format(Locale.getDefault(), "try to set flags: %d -> %d", flags, flags | 1 << 6));
 									flags |= 1 << 6;
 									param.args[5] = flags;
 								}
