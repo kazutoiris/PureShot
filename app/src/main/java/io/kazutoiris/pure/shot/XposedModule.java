@@ -4,6 +4,8 @@ import android.util.SparseIntArray;
 import android.view.WindowManager;
 
 import java.lang.reflect.Constructor;
+import java.util.Arrays;
+import java.util.Locale;
 import java.util.Objects;
 
 import de.robv.android.xposed.IXposedHookLoadPackage;
@@ -29,14 +31,20 @@ public class XposedModule implements IXposedHookLoadPackage {
 					// private SurfaceControl(SurfaceSession session, String name, int w, int h, int format, int flags,
 					//         SurfaceControl parent, SparseIntArray metadata, WeakReference<View> localOwnerView,
 					//         String callsite)
+					XposedBridge.log(String.format(Locale.getDefault(), "current constructor(%d): %s", constructor.getParameterCount(), constructor.toString()));
 					if (constructor.getParameterCount() == 10) {
+						XposedBridge.log("find hook point!");
 						XposedBridge.hookMethod(constructor, new XC_MethodHook() {
 							@Override
 							protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
 								super.beforeHookedMethod(param);
+								XposedBridge.log("args: " + Arrays.toString(param.args));
 								SparseIntArray metadata = (SparseIntArray) param.args[7];
+								XposedBridge.log("metadata: " + metadata.toString());
 								int windowType = metadata.get(2);
+								XposedBridge.log("windowType: " + windowType);
 								if (windowType < WindowManager.LayoutParams.FIRST_SYSTEM_WINDOW || windowType == WindowManager.LayoutParams.TYPE_WALLPAPER) {
+									XposedBridge.log("ignored current window");
 									return;
 								}
 								int flags = (int) param.args[5];
