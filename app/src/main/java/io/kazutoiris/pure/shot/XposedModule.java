@@ -1,5 +1,6 @@
 package io.kazutoiris.pure.shot;
 
+import android.os.Build;
 import android.util.SparseIntArray;
 import android.view.WindowManager;
 
@@ -23,7 +24,7 @@ public class XposedModule implements IXposedHookLoadPackage {
 		ClassLoader classLoader = lpparam.classLoader;
 
 		if (Objects.equals(lpparam.packageName, "android")) {
-			{
+			if (android.os.Build.VERSION.SDK_INT <= Build.VERSION_CODES.BAKLAVA) {
 				Class<?> hookClass = XposedHelpers.findClassIfExists(android.view.SurfaceControl.class.getCanonicalName(), classLoader);
 				for (Constructor<?> constructor : hookClass.getDeclaredConstructors()) {
 					// private SurfaceControl(SurfaceSession session, String name, int w, int h, int format, int flags,
@@ -53,6 +54,33 @@ public class XposedModule implements IXposedHookLoadPackage {
 							}
 						});
 					}
+				}
+			} else {
+				// Android 17+ (flag com.android.window.flags.use_client_surface): the client creates
+				// its own buffer surface, so WindowStateAnimator.createSurfaceLocked() returns early and
+				// the "WindowSurfaceController" callsite above never fires. Mark the server-owned
+				// WindowState container surface instead; SKIP_SCREENSHOT is inherited by its children.
+				Class<?> windowStateClass = XposedHelpers.findClassIfExists("com.android.server.wm.WindowState", classLoader);
+				if (windowStateClass != null) {
+					XposedHelpers.findAndHookMethod(windowStateClass, "setInitialSurfaceControlProperties", android.view.SurfaceControl.Builder.class,
+							new XC_MethodHook() {
+								@Override
+								protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+									super.afterHookedMethod(param);
+									WindowManager.LayoutParams attrs = (WindowManager.LayoutParams) XposedHelpers.getObjectField(param.thisObject, "mAttrs");
+									int windowType = attrs.type;
+									if (windowType < WindowManager.LayoutParams.FIRST_SYSTEM_WINDOW || windowType == WindowManager.LayoutParams.TYPE_WALLPAPER) {
+										return;
+									}
+									android.view.SurfaceControl surfaceControl = (android.view.SurfaceControl) XposedHelpers.getObjectField(param.thisObject, "mSurfaceControl");
+									if (surfaceControl == null) {
+										return;
+									}
+									Object t = XposedHelpers.callMethod(param.thisObject, "getPendingTransaction");
+									XposedHelpers.callMethod(t, "setSkipScreenshot", surfaceControl, true);
+								}
+							}
+					);
 				}
 			}
 		}
